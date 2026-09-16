@@ -4,7 +4,7 @@ import { useState } from "react";
 import { getOutbox, removeOutbox } from "@/lib/store";
 import type { QueuedSubmission } from "@/lib/store";
 import { submitToBaserow, rehydrateEntryPhotos } from "@/lib/submit";
-import { INSPECTION_TABLE_ID, DRIVER_TABLE_ID } from "@/lib/config";
+import { INSPECTION_TABLE_ID, DRIVER_TABLE_ID, VEHICLE_CLIENT_TABLE_ID } from "@/lib/config";
 
 export default function Outbox() {
   const [entries, setEntries] = useState<QueuedSubmission[]>(() => getOutbox());
@@ -14,11 +14,13 @@ export default function Outbox() {
   if (entries.length === 0) return null;
 
   const kindLabel = (prefix: string) =>
-    prefix === "pre" ? "PRE" : prefix === "post" ? "POST" : "DRIVER";
+    prefix === "pre" ? "PRE" : prefix === "post" ? "POST" : prefix === "vehicleClient" ? "CLIENT" : "DRIVER";
 
   const resubmit = async (entry: QueuedSubmission) => {
     setState((s) => ({ ...s, [entry.id]: "busy" }));
-    const tableId = entry.tableId ?? (entry.prefix === "driver" ? DRIVER_TABLE_ID : INSPECTION_TABLE_ID);
+    const tableId =
+      entry.tableId ??
+      (entry.prefix === "driver" ? DRIVER_TABLE_ID : entry.prefix === "vehicleClient" ? VEHICLE_CLIENT_TABLE_ID : INSPECTION_TABLE_ID);
     const { items, resolvedEvidence, resolvedPrimaryPhoto } = await rehydrateEntryPhotos(entry.items, entry.evidence, entry.primaryPhoto);
     const result = await submitToBaserow(
       tableId,
@@ -49,7 +51,7 @@ export default function Outbox() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `${entry.prefix}_${entry.fields.vehicleNo || entry.fields.fullName || "submission"}.json`;
+    a.download = `${entry.prefix}_${entry.fields.vehicleNo || entry.fields.fullName || entry.fields.clientName || "submission"}.json`;
     document.body.appendChild(a);
     a.click();
     a.remove();
@@ -65,11 +67,11 @@ export default function Outbox() {
       {entries.map((e) => (
         <div className="outbox-item" key={e.id}>
           <div className="outbox-meta">
-            <span className={`pill-mini ${e.prefix === "pre" ? "pre" : e.prefix === "post" ? "post" : "driver"}`}>
+            <span className={`pill-mini ${e.prefix === "pre" ? "pre" : e.prefix === "post" ? "post" : e.prefix === "vehicleClient" ? "client" : "driver"}`}>
               {kindLabel(e.prefix)}
             </span>
-            <b>{e.fields.vehicleNo || e.fields.fullName || "—"}</b>
-            <span>{e.fields.driver || ""}</span>
+            <b>{e.fields.vehicleNo || e.fields.fullName || e.fields.clientName || "—"}</b>
+            <span>{e.fields.driver || e.fields.phoneNumber || ""}</span>
             <small>{new Date(e.queuedAt).toLocaleString()}</small>
           </div>
           <div className="outbox-actions">

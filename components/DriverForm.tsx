@@ -5,6 +5,7 @@ import { PhotoEvidence } from "@/components/PhotoEvidence";
 import { useInspectionForm } from "@/lib/useInspectionForm";
 import HomeLink from "@/components/HomeLink";
 import ShareButtons from "@/components/ShareButtons";
+import FormHeader from "@/components/FormHeader";
 import { addValidatedPhoto, removeSavedPhoto } from "@/lib/images";
 import type { LocalPhoto } from "@/lib/images";
 
@@ -133,10 +134,8 @@ export default function DriverForm() {
 
       <main>
         <form onSubmit={onSubmit}>
-          <div className="card">
-            <h2>
-              Driver photo<small>Portrait of the applicant — front-facing picture</small>
-            </h2>
+          <div className="card tone-driver">
+            <FormHeader icon="📷" title="Driver photo" subtitle="Portrait of the applicant — front-facing picture" />
             {primaryPhoto ? (
               <div className="driver-photo-set">
                 <div className="driver-preview-wrap">
@@ -190,10 +189,8 @@ export default function DriverForm() {
             {photoError && <div className="photo-error">{photoError}</div>}
           </div>
 
-          <div className="card">
-            <h2>
-              Driver Application Form<small>Applicant details — fill before interview</small>
-            </h2>
+          <div className="card tone-driver">
+            <FormHeader icon="👤" title="Driver Application Form" subtitle="Applicant details — fill before interview" />
             <div className="row2">
               <div className="field">
                 <label>Full Name *</label>
@@ -319,10 +316,8 @@ export default function DriverForm() {
             </div>
           </div>
 
-          <div className="card">
-            <h2>
-              Photo evidence<small>Licence, Ghana Card or ID photo</small>
-            </h2>
+          <div className="card tone-driver">
+            <FormHeader icon="📄" title="Photo evidence" subtitle="Licence, Ghana Card or ID photo" />
             <div className="field">
               <p className="photo-notice">
                 📷 Photos are <strong>uploaded to the DEGOONY database</strong> with your application,
@@ -337,10 +332,8 @@ export default function DriverForm() {
             </div>
           </div>
 
-          <div className="card">
-            <h2>
-              Guarantor Information<small>Two guarantors are required</small>
-            </h2>
+          <div className="card tone-driver">
+            <FormHeader icon="🤝" title="Guarantor Information" subtitle="Two guarantors are required" />
             <h3 className="guarantor-head">Guarantor #1 (Family Member) *</h3>
             <div className="row2">
               <div className="field">

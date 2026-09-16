@@ -81,6 +81,45 @@ function buildInspectionText(
   return lines.join("\n");
 }
 
+function buildVehicleClientText(fields: Record<string, string>, evidence: EvidencePhoto[]): string {
+  const lines: string[] = [];
+  lines.push("*Vehicle Client Transaction — Evergreen Logistics*");
+  lines.push("");
+
+  const pairs: [string, string][] = [
+    ["Client name", fields.clientName],
+    ["Phone", fields.phoneNumber],
+    ["Vehicle number", fields.vehicleNumber],
+    ["Vehicle type", fields.vehicleType],
+    ["Vehicle description", fields.vehicleDescription],
+    ["Transaction date", fields.transactionDate],
+    ["Transaction time", fields.transactionTime],
+    ["Amount received (GHS)", fields.amountReceived],
+    ["Receipt notes", fields.receiptNotes],
+  ];
+
+  for (const [label, val] of pairs) {
+    if (val) lines.push(`${label}: ${val}`);
+  }
+
+  if (fields.googleDriveLinks) {
+    lines.push("");
+    lines.push("*Google Drive documents*");
+    const links = fields.googleDriveLinks.split("\n").map((l) => l.trim()).filter(Boolean);
+    for (const l of links) lines.push(`• ${l}`);
+  }
+
+  if (evidence.length > 0) {
+    lines.push("");
+    lines.push(`Receipt photo: ${evidence.length} photo(s)`);
+    for (const ev of evidence) {
+      if (ev.caption) lines.push(`  • ${ev.caption}`);
+    }
+  }
+
+  return lines.join("\n");
+}
+
 function buildDriverText(fields: Record<string, string>, evidence: EvidencePhoto[]): string {
   const lines: string[] = [];
   lines.push("*Driver Registration — Evergreen Logistics*");
@@ -142,12 +181,16 @@ function buildEmailBody(
   evidence: EvidencePhoto[],
 ): string {
   if (formType === "Driver Registration") return buildDriverText(fields, evidence);
+  if (formType === "Vehicle Client Transaction") return buildVehicleClientText(fields, evidence);
   return buildInspectionText(formType, fields, items, evidence);
 }
 
 function buildEmailSubject(formType: string, fields: Record<string, string>): string {
   if (formType === "Driver Registration") {
     return `Driver Registration — ${fields.fullName || ""} — ${fields.phoneNumber || ""}`;
+  }
+  if (formType === "Vehicle Client Transaction") {
+    return `Vehicle Client — ${fields.clientName || ""} — ${fields.vehicleNumber || ""}`;
   }
   const prefix = formType.includes("Pre") ? "PRE-TRIP" : "POST-TRIP";
   return `${prefix} — ${fields.vehicleNo || ""} — ${fields.driver || ""}`;

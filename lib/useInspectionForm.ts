@@ -5,7 +5,7 @@ import type { ItemDef, ItemState } from "@/lib/items";
 import type { EvidencePhoto } from "@/components/PhotoEvidence";
 import { submitToBaserow, downloadBackup } from "@/lib/submit";
 import type { SubmitItems } from "@/lib/submit";
-import { INSPECTION_TABLE_ID, DRIVER_TABLE_ID } from "@/lib/config";
+import { INSPECTION_TABLE_ID, DRIVER_TABLE_ID, VEHICLE_CLIENT_TABLE_ID } from "@/lib/config";
 import { saveDraft, draftKey, pushOutbox, rememberDraftKey, loadLatestDraft, clearLatestDraft } from "@/lib/store";
 import type { QueuedSubmission } from "@/lib/store";
 import { loadSavedPhoto } from "@/lib/images";
@@ -34,7 +34,9 @@ export interface FormOptions {
 
 // Baserow destination table for a form prefix.
 function tableIdForPrefix(prefix: string): number {
-  return prefix === "driver" ? DRIVER_TABLE_ID : INSPECTION_TABLE_ID;
+  if (prefix === "driver") return DRIVER_TABLE_ID;
+  if (prefix === "vehicleClient") return VEHICLE_CLIENT_TABLE_ID;
+  return INSPECTION_TABLE_ID;
 }
 
 function emptyItems(items: ItemDef[]): Record<string, ItemState> {

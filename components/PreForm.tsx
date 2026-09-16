@@ -6,6 +6,7 @@ import { InspectionList } from "@/components/InspectionList";
 import { PhotoEvidence } from "@/components/PhotoEvidence";
 import { useInspectionForm } from "@/lib/useInspectionForm";
 import HomeLink from "@/components/HomeLink";
+import FormHeader from "@/components/FormHeader";
 import ShareButtons from "@/components/ShareButtons";
 
 export default function PreForm() {
@@ -98,10 +99,8 @@ export default function PreForm() {
 
       <main>
         <form onSubmit={onSubmit}>
-          <div className="card">
-            <h2>
-              Vehicle &amp; driver<small>Complete before the vehicle is released</small>
-            </h2>
+          <div className="card tone-pre">
+            <FormHeader icon="🚛" title="Vehicle & driver" subtitle="Complete before the vehicle is released" />
             <div className="row2">
               <div className="field">
                 <label>Date</label>
@@ -139,15 +138,13 @@ export default function PreForm() {
               </div>
               <div className="field">
                 <label>Vehicle type</label>
-                <input type="text" value={fields.vehicleType} onChange={(e) => setField("vehicleType", e.target.value)} placeholder="e.g. Van / Truck" />
+                <input type="text" value={fields.vehicleType} onChange={(e) => setField("vehicleType", e.target.value)} placeholder="e.g. Electric Tricycle / Fuel Tricycle" />
               </div>
             </div>
           </div>
 
-          <div className="card">
-            <h2>
-              Pre-trip inspection<small>Mark each item OK, Defect, or N/A</small>
-            </h2>
+          <div className="card tone-pre">
+            <FormHeader icon="✅" title="Pre-trip inspection" subtitle="Mark each item OK, Defect, or N/A" />
             <InspectionList
               items={PRE_ITEMS}
               showPhotos
@@ -156,10 +153,8 @@ export default function PreForm() {
             />
           </div>
 
-          <div className="card">
-            <h2>
-              Existing damage / distinguishing marks<small>Record damage that already existed before departure</small>
-            </h2>
+          <div className="card tone-pre">
+            <FormHeader icon="📝" title="Existing damage / distinguishing marks" subtitle="Record damage that already existed before departure" />
             <div className="field">
               <textarea
                 placeholder="Describe any dents, scratches or marks noted before departure"
@@ -182,20 +177,16 @@ export default function PreForm() {
             </div>
           </div>
 
-          <div className="card">
-            <h2>
-              Driver certification<small>I confirm I inspected this vehicle and truthfully recorded all defects, damage and abnormalities known at time of inspection</small>
-            </h2>
+          <div className="card tone-pre">
+            <FormHeader icon="✍️" title="Driver certification" subtitle="I confirm I inspected this vehicle and truthfully recorded all defects, damage and abnormalities known at time of inspection" />
             <div className="field">
               <label>Driver signature (type full name)</label>
               <input type="text" value={fields.driverCert} onChange={(e) => setField("driverCert", e.target.value)} />
             </div>
           </div>
 
-          <div className="card">
-            <h2>
-              Supervisor release decision<small>Vehicle must be released by an authorized person</small>
-            </h2>
+          <div className="card tone-pre">
+            <FormHeader icon="🛂" title="Supervisor release decision" subtitle="Vehicle must be released by an authorized person" />
             <div className="field">
               <div className="radio-set">
                 {["Fit for operation", "Restricted — see instructions", "Do not deploy / out of service"].map(

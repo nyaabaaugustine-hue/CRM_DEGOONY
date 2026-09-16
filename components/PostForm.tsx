@@ -6,6 +6,7 @@ import { InspectionList } from "@/components/InspectionList";
 import { PhotoEvidence } from "@/components/PhotoEvidence";
 import { useInspectionForm } from "@/lib/useInspectionForm";
 import HomeLink from "@/components/HomeLink";
+import FormHeader from "@/components/FormHeader";
 import ShareButtons from "@/components/ShareButtons";
 
 export default function PostForm() {
@@ -105,10 +106,8 @@ export default function PostForm() {
 
       <main>
         <form onSubmit={onSubmit}>
-          <div className="card">
-            <h2>
-              Return details<small>Record the vehicle condition on return</small>
-            </h2>
+          <div className="card tone-post">
+            <FormHeader icon="🏁" title="Return details" subtitle="Record the vehicle condition on return" />
             <div className="row2">
               <div className="field">
                 <label>Date</label>
@@ -166,10 +165,8 @@ export default function PostForm() {
               </div>
           </div>
 
-          <div className="card">
-            <h2>
-              Post-trip comparison<small>Mark each item OK, Change / Defect, or N/A</small>
-            </h2>
+          <div className="card tone-post">
+            <FormHeader icon="📋" title="Post-trip comparison" subtitle="Mark each item OK, Change / Defect, or N/A" />
             <InspectionList
               items={POST_ITEMS}
               okLabel="OK"
@@ -180,10 +177,8 @@ export default function PostForm() {
             />
           </div>
 
-          <div className="card">
-            <h2>
-              Mandatory variance question<small>Did any accident, incident, near miss, damage, defect, missing component, or material change occur during this deployment?</small>
-            </h2>
+          <div className="card tone-post">
+            <FormHeader icon="⚠️" title="Mandatory variance question" subtitle="Did any accident, incident, near miss, damage, defect, missing component, or material change occur during this deployment?" />
             <div className="field">
               <div className="radio-set">
                 {["No", "Yes"].map((opt) => (
@@ -210,20 +205,16 @@ export default function PostForm() {
             </div>
           </div>
 
-          <div className="card">
-            <h2>
-              Post-trip driver certification<small>I confirm I truthfully reported any accident, incident, near miss, defect, damage, or material change during my responsibility for this vehicle</small>
-            </h2>
+          <div className="card tone-post">
+            <FormHeader icon="✍️" title="Post-trip driver certification" subtitle="I confirm I truthfully reported any accident, incident, near miss, defect, damage, or material change during my responsibility for this vehicle" />
             <div className="field">
               <label>Driver signature (type full name)</label>
               <input type="text" value={fields.driverCert} onChange={(e) => setField("driverCert", e.target.value)} />
             </div>
           </div>
 
-          <div className="card">
-            <h2>
-              Supervisor / maintenance disposition<small>After return, the supervisor decides what happens to the vehicle</small>
-            </h2>
+          <div className="card tone-post">
+            <FormHeader icon="🔧" title="Supervisor / maintenance disposition" subtitle="After return, the supervisor decides what happens to the vehicle" />
             <div className="field">
               <div className="radio-set">
                 {[

@@ -1,7 +1,7 @@
 import type { EvidencePhoto } from "@/components/PhotoEvidence";
 import { getPhoto } from "@/lib/db";
 import type { LocalPhoto } from "@/lib/images";
-import { INSPECTION_TABLE_ID, DRIVER_TABLE_ID } from "@/lib/config";
+import { INSPECTION_TABLE_ID, DRIVER_TABLE_ID, VEHICLE_CLIENT_TABLE_ID } from "@/lib/config";
 import { PRE_ITEMS, POST_ITEMS } from "@/lib/items";
 
 // Structural item shape accepted by submit (status may be typed or plain string —
@@ -82,6 +82,21 @@ function driverTableRow(fields: Record<string, string>): Record<string, unknown>
   };
 }
 
+function vehicleClientTableRow(fields: Record<string, string>): Record<string, unknown> {
+  return {
+    client_name: fields.clientName || "",
+    phone_number: fields.phoneNumber || "",
+    vehicle_number: fields.vehicleNumber || "",
+    vehicle_type: fields.vehicleType || "",
+    vehicle_description: fields.vehicleDescription || "",
+    transaction_date: fields.transactionDate || "",
+    transaction_time: fields.transactionTime || "",
+    amount_received: fields.amountReceived || "",
+    receipt_notes: fields.receiptNotes || "",
+    google_drive_links: fields.googleDriveLinks || "",
+  };
+}
+
 function inspectionsTableRow(
   fields: Record<string, string>,
   itemsState: SubmitItems,
@@ -130,9 +145,12 @@ export async function submitToBaserow(
   subject?: string,
   primaryPhoto?: LocalPhoto | null,
 ): Promise<SubmitResult> {
-  const row = tableIsInspections(tableId)
-    ? inspectionsTableRow(fields, itemsState, prefix, evidence, subject)
-    : driverTableRow(fields);
+  const row =
+    tableId === VEHICLE_CLIENT_TABLE_ID
+      ? vehicleClientTableRow(fields)
+      : tableIsInspections(tableId)
+        ? inspectionsTableRow(fields, itemsState, prefix, evidence, subject)
+        : driverTableRow(fields);
 
   // Upload on-device photos (primary + items + evidence, in order) to Baserow
   // and stash their file refs, ready for the "photos" file field.

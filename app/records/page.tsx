@@ -3,10 +3,11 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import HomeLink from "@/components/HomeLink";
-import { INSPECTION_TABLE_ID, DRIVER_TABLE_ID } from "@/lib/config";
+import { INSPECTION_TABLE_ID, DRIVER_TABLE_ID, VEHICLE_CLIENT_TABLE_ID } from "@/lib/config";
+import { cacheRows, loadCachedAll } from "@/lib/recordCache";
 
 type Rec = Record<string, unknown>;
-type Tab = "inspection" | "driver";
+type Tab = "inspection" | "driver" | "client";
 
 function asText(v: unknown): string | null {
   if (v == null) return null;
@@ -47,6 +48,29 @@ function humanLabel(key: string): string {
   return key
     .replace(/_/g, " ")
     .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+// Split a field value into tokens and render URL tokens (e.g. Google Drive
+// document links) as clickable links that open the file in a new tab.
+function renderLinkedValue(value: string | null, key: string): React.ReactNode {
+  if (!value) return null;
+  return value.split(/\s+/).filter(Boolean).map((tok, i) =>
+    /^https?:\/\//i.test(tok) ? (
+      <a
+        key={i}
+        className="record-link"
+        href={tok}
+        target="_blank"
+        rel="noreferrer"
+        title="Open document in Google Drive"
+      >
+        {key === "google_drive_links" ? tok.replace(/^https?:\/\/(www\.)?/, "") : tok}
+        <span className="record-link-arrow">↗</span>
+      </a>
+    ) : (
+      <span key={i}>{i > 0 ? " " : ""}{tok}</span>
+    ),
+  );
 }
 
 const API = (tableId: number) => `/api/rows?table=${tableId}`;
@@ -117,22 +141,44 @@ const DRV_FIELDS: FieldDef[] = [
   { key: "guarantor_2_occupation", type: "text" },
 ];
 
-const FIELDS_FOR: Record<Tab, FieldDef[]> = { inspection: INSP_FIELDS, driver: DRV_FIELDS };
+const CLIENT_FIELDS: FieldDef[] = [
+  { key: "client_name", type: "text" },
+  { key: "phone_number", type: "text" },
+  { key: "vehicle_number", type: "text" },
+  { key: "vehicle_type", type: "select", options: ["Electric Tricycle", "Fuel Tricycle"] },
+  { key: "vehicle_description", type: "textarea" },
+  { key: "transaction_date", type: "date" },
+  { key: "transaction_time", type: "text" },
+  { key: "amount_received", type: "text" },
+  { key: "receipt_notes", type: "textarea" },
+  { key: "google_drive_links", type: "textarea" },
+];
+
+const FIELDS_FOR: Record<Tab, FieldDef[]> = { inspection: INSP_FIELDS, driver: DRV_FIELDS, client: CLIENT_FIELDS };
+
+const TAB_META: Record<Tab, { label: string; singular: string; link: string }> = {
+  inspection: { label: "Inspections", singular: "inspection", link: "/pre" },
+  driver: { label: "Drivers", singular: "driver", link: "/driver" },
+  client: { label: "Clients", singular: "client", link: "/vehicle-client" },
+};
 
 export default function RecordsPage() {
   const [tab, setTab] = useState<Tab>("inspection");
-  const [data, setData] = useState<{ inspection: Rec[]; driver: Rec[] }>({
+  const [data, setData] = useState<{ inspection: Rec[]; driver: Rec[]; client: Rec[] }>({
     inspection: [],
     driver: [],
+    client: [],
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [offline, setOffline] = useState<{ savedAt: number } | null>(null);
   const [editing, setEditing] = useState<{ tab: Tab; id: number } | null>(null);
   const [editValues, setEditValues] = useState<Record<string, string>>({});
   const [editBusy, setEditBusy] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
   const [photoBusy, setPhotoBusy] = useState<number | null>(null);
   const [driverPhotoMap, setDriverPhotoMap] = useState<Record<string, string>>({});
+  const [query, setQuery] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploadTarget, setUploadTarget] = useState<{ tableId: number; rowId: number; existing: { url: string; name?: string }[] } | null>(null);
 
@@ -140,14 +186,30 @@ export default function RecordsPage() {
     setLoading(true);
     setError(null);
     try {
-      const [inspection, driver] = await Promise.all([
+      const [inspection, driver, client] = await Promise.all([
         fetchRows(INSPECTION_TABLE_ID),
         fetchRows(DRIVER_TABLE_ID),
+        fetchRows(VEHICLE_CLIENT_TABLE_ID),
       ]);
-      setData({ inspection, driver });
+      setData({ inspection, driver, client });
+      setOffline(null);
+      await Promise.all([
+        cacheRows("inspection", inspection),
+        cacheRows("driver", driver),
+        cacheRows("client", client),
+      ]);
     } catch (e) {
-      setError("Could not load records — check connection or Baserow access.");
-      console.error(e);
+      // Live fetch failed — fall back to the copy of the Baserow data saved
+      // inside the app (IndexedDB). Never fabricate records.
+      const cached = await loadCachedAll();
+      if (cached && (cached.inspection.length || cached.driver.length || cached.client.length)) {
+        setData({ inspection: cached.inspection, driver: cached.driver, client: cached.client });
+        setOffline({ savedAt: cached.savedAt });
+        setError(null);
+      } else {
+        setError("Could not load records — check connection or Baserow access.");
+        console.error(e);
+      }
     } finally {
       setLoading(false);
     }
@@ -220,23 +282,38 @@ export default function RecordsPage() {
     if (!editing) return;
     setEditBusy(true);
     setEditError(null);
-    try {
-      const tableId = editing.tab === "inspection" ? INSPECTION_TABLE_ID : DRIVER_TABLE_ID;
-      const row: Record<string, unknown> = {};
-      for (const f of FIELDS_FOR[editing.tab]) {
-        const raw = (editValues[f.key as string] ?? "").trim();
-        if (f.type === "select") {
-          // Baserow rejects unknown/empty values for single-select fields —
-          // send only a valid option, otherwise omit the field entirely.
-          if (raw !== "" && (f.options || []).includes(raw)) row[f.key as string] = raw;
-        } else if (raw === "") {
-          // "Put dash to all empty place" — only for free text; empty date
-          // fields are omitted (Baserow rejects empty date strings).
-          if (f.type !== "date") row[f.key as string] = "-";
-        } else {
-          row[f.key as string] = raw;
-        }
+    const row: Record<string, unknown> = {};
+    for (const f of FIELDS_FOR[editing.tab]) {
+      const raw = (editValues[f.key as string] ?? "").trim();
+      if (f.type === "select") {
+        // Baserow rejects unknown/empty values for single-select fields —
+        // send only a valid option, otherwise omit the field entirely.
+        if (raw !== "" && (f.options || []).includes(raw)) row[f.key as string] = raw;
+      } else if (raw === "") {
+        // "Put dash to all empty place" — only for free text; empty date
+        // fields are omitted (Baserow rejects empty date strings).
+        if (f.type !== "date") row[f.key as string] = "-";
+      } else {
+        row[f.key as string] = raw;
       }
+    }
+    // Offline edits persist to the in-app cache and sync later.
+    if (offline) {
+      const key = editing.tab as "inspection" | "driver" | "client";
+      const updated = (data[key] as Rec[]).map((r) => (r.id === editing.id ? { ...r, ...row } : r));
+      setData((prev) => ({ ...prev, [key]: updated }));
+      await cacheRows(key, updated);
+      closeEdit();
+      setEditBusy(false);
+      return;
+    }
+    try {
+      const tableId =
+        editing.tab === "inspection"
+          ? INSPECTION_TABLE_ID
+          : editing.tab === "driver"
+            ? DRIVER_TABLE_ID
+            : VEHICLE_CLIENT_TABLE_ID;
       const res = await fetch("/api/rows", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -258,7 +335,20 @@ export default function RecordsPage() {
     }
   };
 
-  const rows = data[tab];
+  const realRows = data[tab];
+  const meta = TAB_META[tab];
+  const rows = realRows;
+  const q = query.trim().toLowerCase();
+  const visibleRows = q
+    ? rows.filter((r) =>
+        Object.entries(r)
+          .filter(([k]) => k !== "photos")
+          .map(([, v]) => asText(v) || "")
+          .join(" ")
+          .toLowerCase()
+          .includes(q),
+      )
+    : rows;
 
   return (
     <>
@@ -266,7 +356,7 @@ export default function RecordsPage() {
         <div className="header-row">
           <div className="brand">
             <h1>Evergreen Logistics</h1>
-            <span>Saved submissions</span>
+            <span>{meta.label} saved</span>
           </div>
           <HomeLink />
         </div>
@@ -274,13 +364,34 @@ export default function RecordsPage() {
       <main>
         <div className="card">
           <div className="records-head">
-            <h2>
-              Submission records
-              <small>Saved to the DEGOONY database — shown here for review.</small>
-            </h2>
+            <div className="records-title">
+              <h2>Submission records</h2>
+              <span className="records-sub">
+                {q
+                  ? `${visibleRows.length} of ${rows.length} ${meta.singular} records match “${query.trim()}”`
+                  : `${rows.length} ${meta.singular} record${rows.length === 1 ? "" : "s"}${offline ? ` · offline copy saved ${new Date(offline.savedAt).toLocaleString()}` : " · DEGOONY database"}`}
+              </span>
+            </div>
             <button type="button" className="btn btn-ghost btn-small refresh-btn" onClick={load} disabled={loading}>
-              {loading ? "Loading…" : "Refresh"}
+              ⟳ {loading ? "Refreshing…" : "Refresh"}
             </button>
+          </div>
+
+          <div className="records-toolbar">
+            <label className="search-box">
+              <span className="search-ico">⌕</span>
+              <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder={`Search ${meta.singular} records…`}
+                enterKeyHint="search"
+              />
+              {query && (
+                <button type="button" className="search-clear" onClick={() => setQuery("")} aria-label="Clear search">
+                  ×
+                </button>
+              )}
+            </label>
           </div>
 
           <div className="tabs">
@@ -300,35 +411,74 @@ export default function RecordsPage() {
               Drivers
               <span className="tab-count">{data.driver.length}</span>
             </button>
+            <button
+              type="button"
+              className={`tab${tab === "client" ? " active" : ""}`}
+              onClick={() => setTab("client")}
+            >
+              Clients
+              <span className="tab-count">{data.client.length}</span>
+            </button>
           </div>
 
           {error && <div className="photo-error">{error}</div>}
+          {offline && !error && (
+            <div className="photo-notice demo-notice">
+              Offline — showing the copy of your records saved in this app{" "}
+              <strong>{new Date(offline.savedAt).toLocaleString()}</strong>. Changes you make now are saved on
+              this device and will sync to the DEGOONY database when the connection returns.
+            </div>
+          )}
           {!error && rows.length === 0 && (
             <div className="empty-state">
-              <p>No {tab === "inspection" ? "inspection" : "driver"} submissions yet.</p>
-              <p>Submitting a form here will show it in this list.</p>
+              <span className="empty-orb" />
+              <p>
+                <strong>No {meta.singular} submissions yet.</strong>
+              </p>
+              <p>Submitting the {meta.singular} form will show it here for review.</p>
+              <Link href={meta.link}>
+                <button type="button" className="btn btn-primary btn-small">
+                  Open {meta.singular} form
+                </button>
+              </Link>
+            </div>
+          )}
+          {!loading && q && visibleRows.length === 0 && rows.length > 0 && (
+            <div className="empty-state">
+              <span className="empty-orb" />
+              <p>
+                <strong>No results for “{query.trim()}”.</strong>
+              </p>
+              <p>Try a different name, ID or keyword.</p>
             </div>
           )}
 
-          {rows.map((row) => {
+          {loading && rows.length === 0 ? (
+            <>
+              <div className="skel" />
+              <div className="skel" />
+              <div className="skel" />
+            </>
+          ) : visibleRows.map((row) => {
             const photos = photosOf(row.photos);
             const recordProfile = photos.length > 0 ? photos[0] : null;
             const driverName = asText(row.driver_name) || asText(row.full_name) || "";
             const lookupKey = driverName.toLowerCase().trim();
             const fallbackPhoto = !recordProfile && driverPhotoMap[lookupKey] ? driverPhotoMap[lookupKey] : null;
-            const profileUrl = recordProfile?.url || fallbackPhoto;
+            const profileUrl = recordProfile?.url || fallbackPhoto || (tab === "client" && photos.length > 0 ? photos[0].url : null);
             const entries = Object.entries(row).filter(
               ([k, v]) => !["id", "created_on", "updated_on", "photos"].includes(k) && asText(v) !== null,
             );
             const title =
               asText(row.driver_name) ||
               asText(row.full_name) ||
-              `${tab === "inspection" ? "Inspection" : "Driver"} record`;
+              asText(row.client_name) ||
+              `${tab === "inspection" ? "Inspection" : tab === "driver" ? "Driver" : "Client"} record`;
             const kind = asText(row.form_type);
             const rowId = typeof row.id === "number" ? row.id : Number(row.id);
-            const tableId = tab === "driver" ? DRIVER_TABLE_ID : INSPECTION_TABLE_ID;
+            const tableId = tab === "driver" ? DRIVER_TABLE_ID : tab === "client" ? VEHICLE_CLIENT_TABLE_ID : INSPECTION_TABLE_ID;
             return (
-              <div className="record-card" key={String(row.id ?? Math.random())}>
+              <div className={`record-card rc-${tab}`} key={String(row.id ?? Math.random())}>
                 <div className="record-title">
                   <button
                     type="button"
@@ -348,9 +498,15 @@ export default function RecordsPage() {
                   </button>
                   <span className="record-name">{title}</span>
                   {kind && <span className="tag tag-unchanged">{kind}</span>}
+                  {tab === "client" && asText(row.amount_received) && (
+                    <span className="tag tag-unchanged">GHS {asText(row.amount_received)}</span>
+                  )}
                 </div>
                 <div className="record-meta">
                   {asText(row.vehicle_no) && <span className="record-chip">{asText(row.vehicle_no)}</span>}
+                  {asText(row.vehicle_number) && !asText(row.vehicle_no) && (
+                    <span className="record-chip">{asText(row.vehicle_number)}</span>
+                  )}
                   {asText(row.created_on) && (
                     <span className="record-chip record-date">
                       {String(asText(row.created_on)).slice(0, 16).replace("T", " ")}
@@ -373,7 +529,7 @@ export default function RecordsPage() {
                     return (
                       <div className="record-field" key={k}>
                         <span className="record-label">{humanLabel(k)}</span>
-                        <span className="record-value">{t}</span>
+                        {renderLinkedValue(t, k)}
                       </div>
                     );
                   })}
@@ -390,7 +546,7 @@ export default function RecordsPage() {
                 {editing && editing.tab === tab && editing.id === row.id && (
                   <div className="edit-panel">
                     <h3>
-                      Edit {tab === "inspection" ? "inspection" : "driver"} record
+                      Edit {tab === "inspection" ? "inspection" : tab === "driver" ? "driver" : "client"} record
                     </h3>
                     {editError && <div className="photo-error">{editError}</div>}
                     <div className="row2">
