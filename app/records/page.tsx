@@ -1,10 +1,12 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import Link from "next/link";
 import HomeLink from "@/components/HomeLink";
 import { INSPECTION_TABLE_ID, DRIVER_TABLE_ID, VEHICLE_CLIENT_TABLE_ID } from "@/lib/config";
 import { cacheRows, loadCachedAll } from "@/lib/recordCache";
+import { analyzeInspections, anomalyLabel } from "@/lib/comparison";
+import type { Analysis, CompareRow, InspectionRow, Verdict } from "@/lib/comparison";
 
 type Rec = Record<string, unknown>;
 type Tab = "inspection" | "driver" | "client";
@@ -162,6 +164,57 @@ const TAB_META: Record<Tab, { label: string; singular: string; link: string }> =
   client: { label: "Clients", singular: "client", link: "/vehicle-client" },
 };
 
+function statusChipClass(status: string): string {
+  if (status === "OK") return "ok";
+  if (status === "DEFECT") return "defect";
+  if (status === "N/A") return "na";
+  return "unrec";
+}
+
+function verdictClass(v: Verdict): string {
+  if (v === "NEW_DEFECT" || v === "PERSISTENT") return "bad";
+  if (v === "RESOLVED") return "good";
+  return "mild";
+}
+
+function renderCompareRows(cmp: CompareRow[]) {
+  const relevant = cmp.filter((c) => c.verdict !== "CLEAR" && c.verdict !== "N_A");
+  if (relevant.length === 0) {
+    return (
+      <div className="cmp-clear">✓ Every recorded item matched between pre and post — no anomalies.</div>
+    );
+  }
+  return (
+    <div className="cmp-list">
+      {relevant.map((c, i) => (
+        <div
+          key={i}
+          className={`cmp-row${
+            c.verdict === "NEW_DEFECT" || c.verdict === "PERSISTENT"
+              ? " anomaly"
+              : c.verdict === "RESOLVED"
+                ? " resolved"
+                : ""
+          }`}
+        >
+          <span className="cmp-system">{c.system}</span>
+          <span className={`cmp-status ${statusChipClass(c.preStatus)}`}>{c.preStatus}</span>
+          <span className="cmp-arrow">→</span>
+          <span className={`cmp-status ${statusChipClass(c.postStatus)}`}>{c.postStatus}</span>
+          <span className={`cmp-verdict ${verdictClass(c.verdict)}`}>
+            {anomalyLabel(c.verdict) || "Not recorded"}
+          </span>
+          {c.notes.length > 0 && (
+            <span className="cmp-note">
+              <b>Note:</b> {c.notes.join(" · ")}
+            </span>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function RecordsPage() {
   const [tab, setTab] = useState<Tab>("inspection");
   const [data, setData] = useState<{ inspection: Rec[]; driver: Rec[]; client: Rec[] }>({
@@ -179,6 +232,7 @@ export default function RecordsPage() {
   const [photoBusy, setPhotoBusy] = useState<number | null>(null);
   const [driverPhotoMap, setDriverPhotoMap] = useState<Record<string, string>>({});
   const [query, setQuery] = useState("");
+  const [inspFilter, setInspFilter] = useState<"all" | "open" | "compared" | "anomaly">("all");
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploadTarget, setUploadTarget] = useState<{ tableId: number; rowId: number; existing: { url: string; name?: string }[] } | null>(null);
 
@@ -338,6 +392,7 @@ export default function RecordsPage() {
   const realRows = data[tab];
   const meta = TAB_META[tab];
   const rows = realRows;
+  const analysis: Analysis = useMemo(() => analyzeInspections(data.inspection as InspectionRow[]), [data.inspection]);
   const q = query.trim().toLowerCase();
   const visibleRows = q
     ? rows.filter((r) =>
@@ -348,7 +403,16 @@ export default function RecordsPage() {
           .toLowerCase()
           .includes(q),
       )
-    : rows;
+    : tab === "inspection"
+      ? rows.filter((r) => {
+          const id = Number(r.id);
+          const st = analysis.statusByRow[id];
+          if (inspFilter === "open") return st?.kind === "open";
+          if (inspFilter === "compared") return st?.kind === "compared";
+          if (inspFilter === "anomaly") return st?.kind === "compared" && st.anomalies > 0;
+          return true;
+        })
+      : rows;
 
   return (
     <>
@@ -420,6 +484,46 @@ export default function RecordsPage() {
               <span className="tab-count">{data.client.length}</span>
             </button>
           </div>
+
+          {tab === "inspection" && rows.length > 0 && (
+            <div className="insp-summary">
+              <span className={`schip${analysis.summary.open > 0 ? " amber" : ""}`}>
+                Open · awaiting post-deploy inspection <b>{analysis.summary.open}</b>
+              </span>
+              <span className="schip green">
+                Compared <b>{analysis.summary.compared}</b>
+              </span>
+              <span className={`schip${analysis.summary.anomalies > 0 ? " red" : " green"}`}>
+                Anomalies detected <b>{analysis.summary.anomalies}</b>
+              </span>
+            </div>
+          )}
+
+          {tab === "inspection" && rows.length > 0 && (
+            <div className="filter-chips">
+              {(
+                [
+                  ["all", "All"],
+                  ["open", "Open"],
+                  ["compared", "Compared"],
+                  ["anomaly", "Anomalies"],
+                ] as const
+              ).map(([key, label]) => (
+                <button
+                  type="button"
+                  key={key}
+                  className={`fchip${inspFilter === key ? " active" : ""}`}
+                  onClick={() => setInspFilter(key)}
+                >
+                  {label}
+                  {key === "all" && <span className="fchip-count">{rows.length}</span>}
+                  {key === "open" && <span className="fchip-count">{analysis.summary.open}</span>}
+                  {key === "compared" && <span className="fchip-count">{analysis.summary.compared}</span>}
+                  {key === "anomaly" && <span className="fchip-count">{analysis.summary.anomalies}</span>}
+                </button>
+              ))}
+            </div>
+          )}
 
           {error && <div className="photo-error">{error}</div>}
           {offline && !error && (
@@ -498,6 +602,35 @@ export default function RecordsPage() {
                   </button>
                   <span className="record-name">{title}</span>
                   {kind && <span className="tag tag-unchanged">{kind}</span>}
+                  {tab === "inspection" &&
+                    (() => {
+                      const st = analysis.statusByRow[rowId];
+                      if (!st) return null;
+                      if (st.kind === "open")
+                        return (
+                          <span
+                            className="tag open"
+                            title="Post-deploy inspection not recorded yet for this vehicle"
+                          >
+                            Open · awaiting post
+                          </span>
+                        );
+                      if (st.kind === "compared")
+                        return st.anomalies > 0 ? (
+                          <span className="tag anomaly" title="Item-by-item comparison found anomalies">
+                            {st.anomalies} anomaly{st.anomalies === 1 ? "" : "ies"}
+                          </span>
+                        ) : (
+                          <span className="tag compared" title="Item-by-item comparison — no anomalies">
+                            Compared
+                          </span>
+                        );
+                      return (
+                        <span className="tag tag-unchanged" title="Post recorded without a matching pre-deploy record">
+                          Standalone post
+                        </span>
+                      );
+                    })()}
                   {tab === "client" && asText(row.amount_received) && (
                     <span className="tag tag-unchanged">GHS {asText(row.amount_received)}</span>
                   )}
@@ -522,6 +655,30 @@ export default function RecordsPage() {
                     ✎ Edit
                   </button>
                 </div>
+                {tab === "inspection" &&
+                  (() => {
+                    const matchPreId = analysis.matchByRow[rowId];
+                    if (matchPreId == null) return null;
+                    const cmp = analysis.panels[matchPreId];
+                    if (!cmp) return null;
+                    const isPost = String(asText(row.form_type) || "")
+                      .toLowerCase()
+                      .includes("post");
+                    if (!isPost) return null;
+                    const st = analysis.statusByRow[rowId];
+                    const hasAnom = st?.kind === "compared" && st.anomalies > 0;
+                    return (
+                      <div className={`cmp-panel${hasAnom ? " has-anomaly" : ""}`}>
+                        <div className="cmp-head">
+                          <span className="cmp-title">
+                            Pre ↔ Post comparison
+                            <span>Pre #{matchPreId} vs Post #{rowId} — item-by-item check</span>
+                          </span>
+                        </div>
+                        {renderCompareRows(cmp)}
+                      </div>
+                    );
+                  })()}
                 <div className="record-grid">
                   {entries.map(([k, v]) => {
                     const t = asText(v);
