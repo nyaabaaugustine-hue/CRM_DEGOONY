@@ -702,7 +702,7 @@ main.home .outbox{max-height:140px;overflow-y:auto;}
 }
 .fchip.active .fchip-count{background:rgba(255,255,255,.22);border-color:transparent;color:#fff;}
 
-/* ---------- Pre ↔ Post comparison panel ---------- */
+/* ---------- Pre ↔ Post comparison panel (side-by-side) ---------- */
 .cmp-panel{
   margin-top:12px;border:1px solid var(--line);border-left:3px solid var(--emerald);
   border-radius:var(--radius-m);background:var(--surface-2);padding:12px 13px;
@@ -711,28 +711,47 @@ main.home .outbox{max-height:140px;overflow-y:auto;}
 .cmp-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;}
 .cmp-title{font-size:12px;font-weight:800;color:var(--pine-900);text-transform:uppercase;letter-spacing:.03em;}
 .cmp-title span{color:var(--muted-2);font-weight:650;text-transform:none;letter-spacing:0;display:block;font-size:11px;margin-top:2px;}
-.cmp-list{display:flex;flex-direction:column;gap:6px;}
+.cmp-list{display:flex;flex-direction:column;gap:8px;}
 .cmp-row{
-  display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+  display:flex;flex-direction:column;gap:5px;
   background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--line-strong);
-  border-radius:var(--radius-s);padding:7px 10px;font-size:12px;
+  border-radius:var(--radius-s);padding:8px 10px;font-size:12px;
 }
 .cmp-row.anomaly{border-left-color:var(--defect);background:#FFF7F6;}
 .cmp-row.resolved{border-left-color:var(--ok);}
-.cmp-system{flex:1;min-width:150px;font-weight:650;color:var(--ink);line-height:1.3;}
-.cmp-status{font-weight:800;font-variant-numeric:tabular-nums;font-size:11px;padding:3px 9px;border-radius:999px;flex:none;}
-.cmp-status.ok{background:var(--ok-bg);color:var(--ok);}
-.cmp-status.defect{background:var(--defect-bg);color:var(--defect);}
-.cmp-status.na{background:var(--na-bg);color:var(--na);}
-.cmp-status.unrec{background:var(--surface-2);color:var(--muted-2);border:1px dashed var(--line-strong);}
-.cmp-arrow{color:var(--muted-2);font-weight:800;flex:none;}
-.cmp-verdict{flex:none;font-size:10px;font-weight:750;padding:3px 9px;border-radius:999px;text-transform:uppercase;letter-spacing:.02em;}
+.cmp-sys{font-weight:750;color:var(--ink);font-size:11.5px;letter-spacing:.01em;}
+.cmp-cards{display:flex;align-items:center;gap:6px;flex-wrap:nowrap;}
+.cmp-card{
+  display:flex;flex-direction:column;align-items:center;gap:2px;
+  flex:1;min-width:0;padding:6px 8px;border-radius:10px;font-variant-numeric:tabular-nums;
+}
+.cmp-card.pre{background:var(--surface-2);border:1px solid var(--line);}
+.cmp-card.post{border:1.5px solid var(--line);}
+.cmp-card.ok{border-color:rgba(22,122,70,.3);}
+.cmp-card.defect{border-color:rgba(192,66,58,.4);background:var(--defect-bg);}
+.cmp-card.na{border-color:var(--line);}
+.cmp-card.unrec{border-style:dashed;border-color:var(--line-strong);}
+.cmp-card.flash{background:var(--defect-bg);box-shadow:0 0 0 2px rgba(192,66,58,.25);}
+.cmp-card-label{font-size:9px;font-weight:750;text-transform:uppercase;letter-spacing:.05em;color:var(--muted-2);}
+.cmp-card-val{font-size:14px;font-weight:800;line-height:1.1;}
+.cmp-card.ok .cmp-card-val{color:var(--ok);}
+.cmp-card.defect .cmp-card-val{color:var(--defect);}
+.cmp-card.na .cmp-card-val{color:var(--na);}
+.cmp-card.unrec .cmp-card-val{color:var(--muted-2);}
+.cmp-arrow{color:var(--muted-2);font-weight:800;font-size:16px;flex:none;line-height:1;}
+.cmp-verdict{font-size:10px;font-weight:750;padding:3px 9px;border-radius:999px;text-transform:uppercase;letter-spacing:.02em;align-self:flex-start;}
 .cmp-verdict.bad{background:var(--defect);color:#fff;}
 .cmp-verdict.good{background:var(--ok);color:#fff;}
 .cmp-verdict.mild{background:#8A5A0B;color:#fff;}
-.cmp-note{flex-basis:100%;color:var(--muted);font-size:11px;line-height:1.4;margin-top:1px;}
+.cmp-note{color:var(--muted);font-size:11px;line-height:1.4;margin-top:1px;}
 .cmp-note b{color:var(--ink);}
 .cmp-clear{font-size:12px;color:var(--ok);font-weight:700;padding:3px 2px;line-height:1.5;}
+@media (max-width:360px){
+  .cmp-cards{gap:4px;}
+  .cmp-card{padding:5px 5px;}
+  .cmp-card-val{font-size:12px;}
+  .cmp-arrow{font-size:13px;}
+}
 
 .skel{
   height:150px;border-radius:var(--radius-l);margin-bottom:12px;

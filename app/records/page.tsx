@@ -186,31 +186,34 @@ function renderCompareRows(cmp: CompareRow[]) {
   }
   return (
     <div className="cmp-list">
-      {relevant.map((c, i) => (
-        <div
-          key={i}
-          className={`cmp-row${
-            c.verdict === "NEW_DEFECT" || c.verdict === "PERSISTENT"
-              ? " anomaly"
-              : c.verdict === "RESOLVED"
-                ? " resolved"
-                : ""
-          }`}
-        >
-          <span className="cmp-system">{c.system}</span>
-          <span className={`cmp-status ${statusChipClass(c.preStatus)}`}>{c.preStatus}</span>
-          <span className="cmp-arrow">→</span>
-          <span className={`cmp-status ${statusChipClass(c.postStatus)}`}>{c.postStatus}</span>
-          <span className={`cmp-verdict ${verdictClass(c.verdict)}`}>
-            {anomalyLabel(c.verdict) || "Not recorded"}
-          </span>
-          {c.notes.length > 0 && (
-            <span className="cmp-note">
-              <b>Note:</b> {c.notes.join(" · ")}
+      {relevant.map((c, i) => {
+        const isAnomaly = c.verdict === "NEW_DEFECT" || c.verdict === "PERSISTENT";
+        const isResolved = c.verdict === "RESOLVED";
+        return (
+          <div key={i} className={`cmp-row${isAnomaly ? " anomaly" : isResolved ? " resolved" : ""}`}>
+            <span className="cmp-sys">{c.system}</span>
+            <div className="cmp-cards">
+              <div className={`cmp-card pre ${statusChipClass(c.preStatus)}`}>
+                <span className="cmp-card-label">Pre</span>
+                <span className="cmp-card-val">{c.preStatus}</span>
+              </div>
+              <span className="cmp-arrow">→</span>
+              <div className={`cmp-card post ${statusChipClass(c.postStatus)}${isAnomaly ? " flash" : ""}`}>
+                <span className="cmp-card-label">Post</span>
+                <span className="cmp-card-val">{c.postStatus}</span>
+              </div>
+            </div>
+            <span className={`cmp-verdict ${verdictClass(c.verdict)}`}>
+              {anomalyLabel(c.verdict) || "Not recorded"}
             </span>
-          )}
-        </div>
-      ))}
+            {c.notes.length > 0 && (
+              <span className="cmp-note">
+                <b>Note:</b> {c.notes.join(" · ")}
+              </span>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -618,7 +621,7 @@ export default function RecordsPage() {
                       if (st.kind === "compared")
                         return st.anomalies > 0 ? (
                           <span className="tag anomaly" title="Item-by-item comparison found anomalies">
-                            {st.anomalies} anomaly{st.anomalies === 1 ? "" : "ies"}
+                            {st.anomalies} anomal{st.anomalies === 1 ? "y" : "ies"}
                           </span>
                         ) : (
                           <span className="tag compared" title="Item-by-item comparison — no anomalies">
